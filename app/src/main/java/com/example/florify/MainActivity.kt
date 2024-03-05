@@ -5,17 +5,21 @@ package com.example.florify
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture.OnImageCapturedCallback
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -27,28 +31,31 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.rememberBottomSheetScaffoldState
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.florify.ui.theme.FlorifyTheme
-import kotlinx.coroutines.launch
+import java.io.IOException
 
 class MainActivity : ComponentActivity() {
 
     companion object {
-        private val PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+        private val PERMISSIONS = arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -64,8 +71,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             FlorifyTheme {
-                val scope = rememberCoroutineScope()
-                val scaffoldState = rememberBottomSheetScaffoldState()
+                // val scope = rememberCoroutineScope()
+
                 val controller = remember {
                     LifecycleCameraController(applicationContext).apply {
                         setEnabledUseCases(
@@ -74,79 +81,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val viewModel = viewModel<MainViewModel>()
-                val bitmaps by viewModel.bitmaps.collectAsState()
-
-                BottomSheetScaffold(
-                    scaffoldState = scaffoldState,
-                    sheetPeekHeight = 0.dp,
-                    sheetContent = {
-                        PhotoBottomSheetContent(
-                            bitmaps = bitmaps,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                        )
-                    },
-                ) { padding ->
-                    Box(modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                    ) {
-                        CameraPreview(
-                            controller = controller,
-                            modifier = Modifier.fillMaxSize()
-                        )
-
-                        IconButton(
-                            onClick = {
-                                controller.cameraSelector =
-                                    if (controller.cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA) {
-                                        CameraSelector.DEFAULT_FRONT_CAMERA
-                                    } else
-                                        CameraSelector.DEFAULT_BACK_CAMERA
-                            },
-                            modifier = Modifier
-                                .offset(16.dp, 16.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.Cameraswitch, contentDescription = "Switch camera")
-                        }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .align(Alignment.BottomCenter)
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceAround
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    scope.launch {
-                                        scaffoldState.bottomSheetState.expand()
-                                    }
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Photo,
-                                    contentDescription = "Open gallery"
-                                )
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    takePhoto(
-                                        controller = controller,
-                                        onPhotoTaken = viewModel::onTakePhoto
-                                    )
-                                }
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PhotoCamera,
-                                    contentDescription = "Take photo"
-                                )
-                            }
-                        }
-                    }
-                }    
+                MainContent(controller = controller)
             }
         }
     }
@@ -160,37 +95,128 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun takePhoto(
-        controller: LifecycleCameraController,
-        onPhotoTaken: (Bitmap) -> Unit
-    ) {
+    @Composable
+    private fun MainContent(controller: LifecycleCameraController) {
+
+        var imageHolder = remember { mutableStateOf<Bitmap?>(null) }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (imageHolder.value != null) {
+                PopupWithImage(
+                    onProceedWithRequest = { imageHolder.value = null },
+                    onDismissRequest = { imageHolder.value = null },
+                    image = imageHolder.value,
+                )
+            }
+
+            CameraPreview(
+                controller = controller,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .background(Color(red = 1.0f, green = 1.0f, blue = 1.0f, alpha = 1.0f)),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                IconButton(
+                    onClick = {
+                        selectPictureFromPhoneGallery(imageHolder)
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Photo,
+                        contentDescription = "Open phone gallery"
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        takePicture(controller, imageHolder)
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoCamera,
+                        contentDescription = "Take photo"
+                    )
+                }
+
+                IconButton(
+                    onClick = {
+                        controller.cameraSelector =
+                            if (controller.cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA) {
+                                CameraSelector.DEFAULT_FRONT_CAMERA
+                            } else
+                                CameraSelector.DEFAULT_BACK_CAMERA
+                    },
+                ) {
+                    Icon(imageVector = Icons.Default.Cameraswitch, contentDescription = "Switch camera")
+                }
+            }
+        }
+    }
+
+    private fun takePicture(controller: LifecycleCameraController, imageHolder: MutableState<Bitmap?>) {
+
         controller.takePicture(
             ContextCompat.getMainExecutor(applicationContext),
             object : OnImageCapturedCallback() {
                 override fun onCaptureSuccess(image: ImageProxy) {
                     super.onCaptureSuccess(image)
 
-                    val matrix = Matrix().apply {
+                    val rotatedBitmap = Matrix().apply {
                         postRotate(image.imageInfo.rotationDegrees.toFloat())
+                    }.let {
+                        Bitmap.createBitmap(
+                            image.toBitmap(),
+                            0,
+                            0,
+                            image.width,
+                            image.height,
+                            it,
+                            true
+                        )
                     }
-                    val rotatedBitmap = Bitmap.createBitmap(
-                        image.toBitmap(),
-                        0,
-                        0,
-                        image.width,
-                        image.height,
-                        matrix,
+
+                    // Add your image normalization logic here
+
+                    val resizedBitmap = Bitmap.createScaledBitmap(
+                        rotatedBitmap,
+                        224,
+                        224,
                         true
                     )
 
-                    onPhotoTaken(rotatedBitmap)
+                    imageHolder.value = resizedBitmap
+
                 }
 
                 override fun onError(exception: ImageCaptureException) {
                     super.onError(exception)
+
                     Log.e("Camera", "Couldn't take photo: ", exception)
                 }
             }
         )
+
     }
+
+    private fun selectPictureFromPhoneGallery(imageHolder: MutableState<Bitmap?>) {
+        val galleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            if (uri != null) {
+                try {
+                    val inputStream = contentResolver.openInputStream(uri)
+                    val bitmap = BitmapFactory.decodeStream(inputStream)
+                    imageHolder.value = bitmap
+                } catch (e: IOException) {
+                    Log.e("Gallery", "Failed to load image:", e)
+                }
+            }
+        }
+
+        galleryLauncher.launch("image/*")
+    }
+
 }
