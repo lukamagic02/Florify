@@ -11,7 +11,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.ManagedActivityResultLauncher
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture.OnImageCapturedCallback
@@ -81,7 +85,31 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                MainContent(controller = controller)
+                var imageHolder = remember { mutableStateOf<Bitmap?>(null) }
+
+                val galleryLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.PickVisualMedia()
+                ) { uri: Uri? ->
+                    if (uri != null) {
+                        try {
+                            val inputStream = contentResolver.openInputStream(uri)
+                            val image = BitmapFactory.decodeStream(inputStream)
+
+                            val resizedImage = Bitmap.createScaledBitmap(
+                                image,
+                                224,
+                                224,
+                                true
+                            )
+
+                            imageHolder.value = resizedImage
+                        } catch (e: IOException) {
+                            Log.e("Gallery", "Failed to load image:", e)
+                        }
+                    }
+                }
+
+                MainContent(controller, imageHolder, galleryLauncher)
             }
         }
     }
@@ -96,9 +124,11 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun MainContent(controller: LifecycleCameraController) {
-
-        var imageHolder = remember { mutableStateOf<Bitmap?>(null) }
+    private fun MainContent(
+        controller: LifecycleCameraController,
+        imageHolder: MutableState<Bitmap?>,
+        galleryLauncher: ManagedActivityResultLauncher<PickVisualMediaRequest, Uri?>
+    ) {
 
         Box(modifier = Modifier.fillMaxSize()) {
             if (imageHolder.value != null) {
@@ -123,7 +153,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 IconButton(
                     onClick = {
-                        selectPictureFromPhoneGallery(imageHolder)
+                        selectPictureFromPhoneGallery(galleryLauncher)
                     }
                 ) {
                     Icon(
@@ -158,39 +188,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun takePicture(controller: LifecycleCameraController, imageHolder: MutableState<Bitmap?>) {
-
+    private fun takePicture(
+        controller: LifecycleCameraController,
+        imageHolder: MutableState<Bitmap?>
+    ) {
         controller.takePicture(
             ContextCompat.getMainExecutor(applicationContext),
             object : OnImageCapturedCallback() {
                 override fun onCaptureSuccess(image: ImageProxy) {
                     super.onCaptureSuccess(image)
 
-                    val rotatedBitmap = Matrix().apply {
-                        postRotate(image.imageInfo.rotationDegrees.toFloat())
-                    }.let {
-                        Bitmap.createBitmap(
-                            image.toBitmap(),
-                            0,
-                            0,
-                            image.width,
-                            image.height,
-                            it,
-                            true
-                        )
-                    }
-
-                    // Add your image normalization logic here
-
-                    val resizedBitmap = Bitmap.createScaledBitmap(
-                        rotatedBitmap,
-                        224,
-                        224,
-                        true
-                    )
-
-                    imageHolder.value = resizedBitmap
-
+                    preprocessImage(image, imageHolder)
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -203,20 +211,43 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    private fun selectPictureFromPhoneGallery(imageHolder: MutableState<Bitmap?>) {
-        val galleryLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-            if (uri != null) {
-                try {
-                    val inputStream = contentResolver.openInputStream(uri)
-                    val bitmap = BitmapFactory.decodeStream(inputStream)
-                    imageHolder.value = bitmap
-                } catch (e: IOException) {
-                    Log.e("Gallery", "Failed to load image:", e)
-                }
-            }
+    private fun preprocessImage(
+        image: ImageProxy,
+        imageHolder: MutableState<Bitmap?>
+
+    ) {
+        val rotatedBitmap = Matrix().apply {
+            postRotate(image.imageInfo.rotationDegrees.toFloat())
+        }.let {
+            Bitmap.createBitmap(
+                image.toBitmap(),
+                0,
+                0,
+                image.width,
+                image.height,
+                it,
+                true
+            )
         }
 
-        galleryLauncher.launch("image/*")
+        // Add your image normalization logic here
+
+        val resizedBitmap = Bitmap.createScaledBitmap(
+            rotatedBitmap,
+            224,
+            224,
+            true
+        )
+
+        imageHolder.value = resizedBitmap
+    }
+
+    private fun selectPictureFromPhoneGallery(
+        galleryLauncher: ManagedActivityResultLauncher<PickVisualMediaRequest, Uri?>
+    ) {
+        galleryLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
     }
 
 }
