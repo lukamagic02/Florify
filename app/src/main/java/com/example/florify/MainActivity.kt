@@ -14,7 +14,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -23,14 +22,13 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.view.CameraController
 import androidx.camera.view.LifecycleCameraController
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Photo
@@ -43,13 +41,21 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navigation
 import com.example.florify.ui.theme.FlorifyTheme
 import java.io.IOException
 
@@ -74,42 +80,56 @@ class MainActivity : ComponentActivity() {
         } // add the else block later
 
         setContent {
+
             FlorifyTheme {
-                // val scope = rememberCoroutineScope()
 
-                val controller = remember {
-                    LifecycleCameraController(applicationContext).apply {
-                        setEnabledUseCases(
-                            CameraController.IMAGE_CAPTURE
-                        )
-                    }
-                }
+                val navController = rememberNavController()
+                NavHost(navController, "onboarding") {
+                    navigation(startDestination = "pick_image", route = "onboarding") {
+                        composable("pick_image") {
+                            val viewModel = it.sharedViewModel<ImageViewModel>(navController)
+                            val image by viewModel.image.collectAsStateWithLifecycle()
 
-                var imageHolder = remember { mutableStateOf<Bitmap?>(null) }
+                            val galleryLauncher = rememberLauncherForActivityResult(
+                                ActivityResultContracts.PickVisualMedia()
+                            ) { uri: Uri? ->
+                                if (uri != null) {
+                                    try {
+                                        val inputStream = contentResolver.openInputStream(uri)
+                                        val image = BitmapFactory.decodeStream(inputStream)
 
-                val galleryLauncher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.PickVisualMedia()
-                ) { uri: Uri? ->
-                    if (uri != null) {
-                        try {
-                            val inputStream = contentResolver.openInputStream(uri)
-                            val image = BitmapFactory.decodeStream(inputStream)
+                                        val resizedImage = Bitmap.createScaledBitmap(
+                                            image,
+                                            224,
+                                            224,
+                                            true
+                                        )
 
-                            val resizedImage = Bitmap.createScaledBitmap(
-                                image,
-                                224,
-                                224,
-                                true
+                                        viewModel.storeImage(resizedImage)
+                                    } catch (e: IOException) {
+                                        Log.e("Gallery", "Failed to load image:", e)
+                                    }
+                                }
+                            }
+
+                            PickImageScreen(
+                                galleryLauncher = galleryLauncher,
+                                image = image,
+                                changeImage = {image: Bitmap? -> viewModel.storeImage(image)},
+                                navigateTo = {destination: String -> navController.navigate(destination)}
                             )
+                        }
 
-                            imageHolder.value = resizedImage
-                        } catch (e: IOException) {
-                            Log.e("Gallery", "Failed to load image:", e)
+                        composable("classify_image") {
+                            val viewModel = it.sharedViewModel<ImageViewModel>(navController)
+                            val image by viewModel.image.collectAsStateWithLifecycle()
+
+                            image?.let { it1 ->
+                                ClassifyImageScreen(it1)
+                            }
                         }
                     }
                 }
-
-                MainContent(controller, imageHolder, galleryLauncher)
             }
         }
     }
@@ -124,23 +144,32 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun MainContent(
-        controller: LifecycleCameraController,
-        imageHolder: MutableState<Bitmap?>,
-        galleryLauncher: ManagedActivityResultLauncher<PickVisualMediaRequest, Uri?>
+    private fun PickImageScreen(
+        galleryLauncher: ManagedActivityResultLauncher<PickVisualMediaRequest, Uri?>,
+        image: Bitmap?,
+        changeImage: (Bitmap?) -> Unit,
+        navigateTo: (String) -> Unit
     ) {
 
+        val camController = remember {
+            LifecycleCameraController(applicationContext).apply {
+                setEnabledUseCases(
+                    CameraController.IMAGE_CAPTURE
+                )
+            }
+        }
+
         Box(modifier = Modifier.fillMaxSize()) {
-            if (imageHolder.value != null) {
+            if (image != null) {
                 PopupWithImage(
-                    onProceedWithRequest = { imageHolder.value = null },
-                    onDismissRequest = { imageHolder.value = null },
-                    image = imageHolder.value,
+                    onProceedWithRequest = { navigateTo("classify_image") },
+                    onDismissRequest = { changeImage(null) },
+                    image = image,
                 )
             }
 
             CameraPreview(
-                controller = controller,
+                camController = camController,
                 modifier = Modifier.fillMaxSize()
             )
 
@@ -164,7 +193,7 @@ class MainActivity : ComponentActivity() {
 
                 IconButton(
                     onClick = {
-                        takePicture(controller, imageHolder)
+                        takePicture(camController, changeImage)
                     }
                 ) {
                     Icon(
@@ -175,8 +204,8 @@ class MainActivity : ComponentActivity() {
 
                 IconButton(
                     onClick = {
-                        controller.cameraSelector =
-                            if (controller.cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA) {
+                        camController.cameraSelector =
+                            if (camController.cameraSelector == CameraSelector.DEFAULT_BACK_CAMERA) {
                                 CameraSelector.DEFAULT_FRONT_CAMERA
                             } else
                                 CameraSelector.DEFAULT_BACK_CAMERA
@@ -189,16 +218,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun takePicture(
-        controller: LifecycleCameraController,
-        imageHolder: MutableState<Bitmap?>
+        camController: LifecycleCameraController,
+        changeImage: (Bitmap?) -> Unit
     ) {
-        controller.takePicture(
+        camController.takePicture(
             ContextCompat.getMainExecutor(applicationContext),
             object : OnImageCapturedCallback() {
                 override fun onCaptureSuccess(image: ImageProxy) {
                     super.onCaptureSuccess(image)
 
-                    preprocessImage(image, imageHolder)
+                    preprocessImage(image, changeImage)
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -213,8 +242,7 @@ class MainActivity : ComponentActivity() {
 
     private fun preprocessImage(
         image: ImageProxy,
-        imageHolder: MutableState<Bitmap?>
-
+        changeImage: (Bitmap?) -> Unit
     ) {
         val rotatedBitmap = Matrix().apply {
             postRotate(image.imageInfo.rotationDegrees.toFloat())
@@ -239,7 +267,7 @@ class MainActivity : ComponentActivity() {
             true
         )
 
-        imageHolder.value = resizedBitmap
+        changeImage(resizedBitmap)
     }
 
     private fun selectPictureFromPhoneGallery(
@@ -250,4 +278,26 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    @Composable
+    private fun ClassifyImageScreen(image: Bitmap) {
+        Box(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Image(
+                bitmap = image.asImageBitmap(),
+                contentDescription = "Flower image"
+            )
+        }
+    }
+
+    @Composable
+    inline fun <reified T : ViewModel> NavBackStackEntry.sharedViewModel(
+        navController: NavHostController
+    ) : T {
+        val parentScreenRoute = destination.parent?.route ?: return viewModel()
+        val parentEntry = remember(this) {
+            navController.getBackStackEntry(parentScreenRoute)
+        }
+        return viewModel(parentEntry)
+    }
 }
