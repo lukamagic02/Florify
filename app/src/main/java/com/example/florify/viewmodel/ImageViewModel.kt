@@ -1,11 +1,11 @@
-package com.example.florify
+package com.example.florify.viewmodel
 
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class ImageViewModel() : ViewModel() {
+class ImageViewModel : ViewModel() {
 
     private var _image = MutableStateFlow<Bitmap?>(null)
     val image = _image.asStateFlow()

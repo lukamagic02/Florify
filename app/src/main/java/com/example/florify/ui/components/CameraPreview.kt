@@ -1,4 +1,4 @@
-package com.example.florify
+package com.example.florify.ui.components
 
 import androidx.camera.view.LifecycleCameraController
 import androidx.camera.view.PreviewView

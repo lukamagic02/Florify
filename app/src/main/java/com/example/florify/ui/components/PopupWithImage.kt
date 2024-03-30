@@ -1,4 +1,4 @@
-package com.example.florify
+package com.example.florify.ui.components
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
