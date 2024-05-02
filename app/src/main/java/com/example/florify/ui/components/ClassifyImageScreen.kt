@@ -39,10 +39,12 @@ fun ClassifyImageScreen(
                 .background(Color(red = 1.0f, green = 1.0f, blue = 1.0f, alpha = 1.0f))
         ) {
 
+            /*
             Image(
                 bitmap = image.asImageBitmap(),
                 contentDescription = "Flower image"
             )
+             */
 
             results.forEach {
                 Text(

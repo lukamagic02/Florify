@@ -26,7 +26,7 @@ object Util {
         )
     }
 
-    fun preprocessPicture(
+    fun preprocessImage(
         image: ImageProxy,
         changeImage: (Bitmap?) -> Unit
     ) {
@@ -51,7 +51,6 @@ object Util {
             true
         )
 
-        /*
         val normalizedBitmap = Bitmap.createBitmap(
             resizedBitmap.width,
             resizedBitmap.height,
@@ -67,17 +66,16 @@ object Util {
                 val blue = Color.blue(pixel) / 255.0f
 
                 val normalizedPixel = Color.rgb(
-                    Color.red(pixel) / 255.0f,
-                    Color.green(pixel) / 255.0f,
-                    Color.blue(pixel) / 255.0f
+                    red,
+                    green,
+                    blue
                 )
 
                 normalizedBitmap.setPixel(x, y, normalizedPixel)
             }
         }
-         */
 
-        changeImage(resizedBitmap)
+        changeImage(normalizedBitmap)
     }
 
     fun takePicture(
@@ -88,10 +86,11 @@ object Util {
         camController.takePicture(
             ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageCapturedCallback() {
+
+                // if the image is captured successfully,
                 override fun onCaptureSuccess(image: ImageProxy) {
                     super.onCaptureSuccess(image)
-
-                    preprocessPicture(image, changeImage)
+                    preprocessImage(image, changeImage)
                 }
 
                 override fun onError(exception: ImageCaptureException) {

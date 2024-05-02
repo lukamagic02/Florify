@@ -3,6 +3,7 @@ package com.example.florify.ui.components
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -38,11 +39,14 @@ fun Navigation(
                 val galleryLauncher = rememberLauncherForActivityResult(
                     ActivityResultContracts.PickVisualMedia()
                 ) { uri: Uri? ->
+
                     if (uri != null) {
+
                         try {
                             val inputStream = context.contentResolver.openInputStream(uri)
                             val image = BitmapFactory.decodeStream(inputStream)
 
+                            /*
                             val resizedImage = Bitmap.createScaledBitmap(
                                 image,
                                 224,
@@ -50,11 +54,39 @@ fun Navigation(
                                 true
                             )
 
-                            viewModel.storeImage(resizedImage)
+                            val normalizedBitmap = Bitmap.createBitmap(
+                                resizedImage.width,
+                                resizedImage.height,
+                                resizedImage.config
+                            )
+
+                            for (x in 0 until resizedImage.width) {
+                                for (y in 0 until resizedImage.height) {
+                                    val pixel = resizedImage.getPixel(x, y)
+
+                                    val red = Color.red(pixel) / 255.0f
+                                    val green = Color.green(pixel) / 255.0f
+                                    val blue = Color.blue(pixel) / 255.0f
+
+                                    val normalizedPixel = Color.rgb(
+                                        red,
+                                        green,
+                                        blue
+                                    )
+
+                                    normalizedBitmap.setPixel(x, y, normalizedPixel)
+                                }
+                            }
+                             */
+
+                            viewModel.storeImage(image)
+
                         } catch (e: IOException) {
                             Log.e("Gallery", "Failed to load image:", e)
                         }
+
                     }
+
                 }
 
                 PickImageScreen(
