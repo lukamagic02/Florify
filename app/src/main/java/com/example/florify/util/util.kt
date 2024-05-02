@@ -3,6 +3,7 @@ package com.example.florify.util
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.graphics.Matrix
 import android.net.Uri
 import android.util.Log
@@ -43,14 +44,38 @@ object Util {
             )
         }
 
-        // Add your image normalization logic here
-
         val resizedBitmap = Bitmap.createScaledBitmap(
             rotatedBitmap,
             224,
             224,
             true
         )
+
+        /*
+        val normalizedBitmap = Bitmap.createBitmap(
+            resizedBitmap.width,
+            resizedBitmap.height,
+            resizedBitmap.config
+        )
+
+        for (x in 0 until resizedBitmap.width) {
+            for (y in 0 until resizedBitmap.height) {
+                val pixel = resizedBitmap.getPixel(x, y)
+
+                val red = Color.red(pixel) / 255.0f
+                val green = Color.green(pixel) / 255.0f
+                val blue = Color.blue(pixel) / 255.0f
+
+                val normalizedPixel = Color.rgb(
+                    Color.red(pixel) / 255.0f,
+                    Color.green(pixel) / 255.0f,
+                    Color.blue(pixel) / 255.0f
+                )
+
+                normalizedBitmap.setPixel(x, y, normalizedPixel)
+            }
+        }
+         */
 
         changeImage(resizedBitmap)
     }

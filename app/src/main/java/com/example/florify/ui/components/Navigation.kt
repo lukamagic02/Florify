@@ -26,7 +26,9 @@ import java.io.IOException
 fun Navigation(
     context: Context
 ) {
+
     val navController = rememberNavController()
+
     NavHost(navController, "onboarding") {
         navigation(startDestination = "pick_image", route = "onboarding") {
             composable("pick_image") {
@@ -69,7 +71,7 @@ fun Navigation(
                 val image by viewModel.image.collectAsStateWithLifecycle()
 
                 image?.let { it1 ->
-                    ClassifyImageScreen(it1)
+                    ClassifyImageScreen(context, it1)
                 }
             }
         }
