@@ -76,9 +76,7 @@ fun Navigation(
                 val viewModel = it.sharedViewModel<ImageViewModel>(navController)
                 // this image variable basically acts as an interface between a client
                 // and the State<> object (?)
-                val image by viewModel.image.collectAsStateWithLifecycle()
-
-                image?.let { image -> ClassifyImageScreen(context, image) }
+                ClassifyImageScreen(context, viewModel, navController)
             }
 
         }
