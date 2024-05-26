@@ -27,12 +27,18 @@ import java.io.IOException
 fun Navigation(
     context: Context
 ) {
-
+    // controls navigation between different screens in the app
     val navController = rememberNavController()
 
+    // container for apps navigation graph, takes 3 arguments: navController,
+    // startDestination (the initial screen to display when NavHost is first rendered)
+    // and ... (still don't quite understand NavGraphBuilder, NavBackStackEntry, nested graphs...)
     NavHost(navController, "onboarding") {
+
         navigation(startDestination = "pick_image", route = "onboarding") {
+
             composable("pick_image") {
+
                 val viewModel = it.sharedViewModel<ImageViewModel>(navController)
                 val image by viewModel.image.collectAsStateWithLifecycle()
 
@@ -40,47 +46,13 @@ fun Navigation(
                     ActivityResultContracts.PickVisualMedia()
                 ) { uri: Uri? ->
 
-                    if (uri != null) {
+                    uri?.let {
 
                         try {
                             val inputStream = context.contentResolver.openInputStream(uri)
                             val image = BitmapFactory.decodeStream(inputStream)
 
-                            /*
-                            val resizedImage = Bitmap.createScaledBitmap(
-                                image,
-                                224,
-                                224,
-                                true
-                            )
-
-                            val normalizedBitmap = Bitmap.createBitmap(
-                                resizedImage.width,
-                                resizedImage.height,
-                                resizedImage.config
-                            )
-
-                            for (x in 0 until resizedImage.width) {
-                                for (y in 0 until resizedImage.height) {
-                                    val pixel = resizedImage.getPixel(x, y)
-
-                                    val red = Color.red(pixel) / 255.0f
-                                    val green = Color.green(pixel) / 255.0f
-                                    val blue = Color.blue(pixel) / 255.0f
-
-                                    val normalizedPixel = Color.rgb(
-                                        red,
-                                        green,
-                                        blue
-                                    )
-
-                                    normalizedBitmap.setPixel(x, y, normalizedPixel)
-                                }
-                            }
-                             */
-
                             viewModel.storeImage(image)
-
                         } catch (e: IOException) {
                             Log.e("Gallery", "Failed to load image:", e)
                         }
@@ -96,27 +68,38 @@ fun Navigation(
                     changeImage = {image: Bitmap? -> viewModel.storeImage(image)},
                     navigateTo = {destination: String -> navController.navigate(destination)}
                 )
+
             }
 
             composable("classify_image") {
+
                 val viewModel = it.sharedViewModel<ImageViewModel>(navController)
+                // this image variable basically acts as an interface between a client
+                // and the State<> object (?)
                 val image by viewModel.image.collectAsStateWithLifecycle()
 
-                image?.let { it1 ->
-                    ClassifyImageScreen(context, it1)
-                }
+                image?.let { image -> ClassifyImageScreen(context, image) }
             }
+
         }
     }
 }
 
+// function that enables propagating the same viewModel instance across different screens
 @Composable
-inline fun <reified T : ViewModel> NavBackStackEntry.sharedViewModel(
+// NavBackStackEntry is a stack that contains the screens the user has already been on,
+// where the top of the stack is the screen the user is currently on, while the entry below
+// that one represents the destination that the user visited prior to the current one
+private inline fun <reified T : ViewModel> NavBackStackEntry.sharedViewModel(
     navController: NavHostController
 ) : T {
-    val parentScreenRoute = destination.parent?.route ?: return viewModel()
+
+    // destination is a NavBackStackEntry property accessible like this because we are currently
+    // inside of a NavBackStackEntry instance
+    val parentScreenRoute = destination?.parent?.route ?: return viewModel()
     val parentEntry = remember(this) {
         navController.getBackStackEntry(parentScreenRoute)
     }
+
     return viewModel(parentEntry)
 }

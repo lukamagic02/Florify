@@ -14,13 +14,10 @@ class MyImageClassifier(
     private val context: Context,
     private val scoreThreshold: Float = 0.0f,
     private val maxResults: Int = 1
-): Classifier {
+) : Classifier {
 
     private var classifier: ImageClassifier? = null
-    private var imageProcessor: ImageProcessor = ImageProcessor.Builder()
-        //.add(ResizeOp(224, 224, ResizeOp.ResizeMethod.NEAREST_NEIGHBOR))
-        //.add(NormalizeOp(0.0f, 255.0f))
-        .build()
+    private var imageProcessor: ImageProcessor = ImageProcessor.Builder().build()
 
     // method for image classification
     override fun classify(bitmapImage: Bitmap): List<Classification> {
@@ -30,19 +27,20 @@ class MyImageClassifier(
 
         // transforming the given bitmap to a tensor image
         val tensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmapImage))
-        val results = classifier?.classify(tensorImage)
+        val result = classifier?.classify(tensorImage)
 
-
-        val finalResults = results?.flatMap { classifications ->
+        // mapping the computed classifications to a list of Classification objects
+        val classificationsList = result?.flatMap { classifications ->
             classifications.categories.map { category ->
                 Classification(
-                    category.label,  // changed from category.displayName
+                    category.label,
                     category.score
                 )
             }
         } ?: emptyList()
 
-        return finalResults
+        return classificationsList
+
     }
 
     // function for classifier initialization
