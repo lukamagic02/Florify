@@ -1,4 +1,4 @@
-package com.example.florify.ui.theme
+package com.example.florify.view.theme
 
 import androidx.compose.ui.graphics.Color
 

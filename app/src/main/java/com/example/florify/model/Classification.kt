@@ -1,4 +1,4 @@
-package com.example.florify.domain
+package com.example.florify.model
 
 data class Classification(
     val category: String,

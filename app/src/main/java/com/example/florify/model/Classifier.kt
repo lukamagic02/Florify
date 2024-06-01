@@ -1,4 +1,4 @@
-package com.example.florify.domain
+package com.example.florify.model
 
 import android.graphics.Bitmap
 

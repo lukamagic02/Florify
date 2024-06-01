@@ -1,9 +1,8 @@
-package com.example.florify.ui.components
+package com.example.florify.view.components
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult

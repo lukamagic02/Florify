@@ -1,4 +1,4 @@
-package com.example.florify.ui.theme
+package com.example.florify.view.theme
 
 import android.app.Activity
 import android.os.Build

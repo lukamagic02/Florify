@@ -8,8 +8,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.core.app.ActivityCompat
-import com.example.florify.ui.components.Navigation
-import com.example.florify.ui.theme.FlorifyTheme
+import com.example.florify.view.components.Navigation
+import com.example.florify.view.theme.FlorifyTheme
 import com.example.florify.util.Util.hasRequiredPermissions
 
 class MainActivity : ComponentActivity() {
